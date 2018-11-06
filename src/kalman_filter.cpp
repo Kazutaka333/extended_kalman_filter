@@ -1,6 +1,8 @@
 #include "kalman_filter.h"
 #include <math.h>
+#include <iostream>
 
+using namespace std;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
@@ -26,6 +28,7 @@ void KalmanFilter::Predict() {
   TODO:
     * predict the state
   */
+
   x_ = F_ * x_;
   MatrixXd Ft = F_.transpose();
   P_ = F_ * P_ * Ft + Q_;
@@ -51,29 +54,39 @@ void KalmanFilter::Update(const VectorXd &z) {
   P_ = (I - K * H_) * P_; 
 }
 
+float getValidAngle(const float &angle) {
+  float phi = angle;
+  while (phi < -M_PI || M_PI < phi) {
+    if (phi > M_PI) {
+      phi -= 2*M_PI;
+    } else if (phi < -M_PI) {
+      phi += 2*M_PI;
+    } 
+  }
+  return phi;
+}
+
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
   /**
   TODO:
     * update the state by using Extended Kalman Filter equations
   */
-  VectorXd my_z = z;
-  while (true) {
-    if (my_z[1] > M_PI) {
-      my_z[1] -= M_PI;
-    } else if (my_z[1] < -M_PI) {
-      my_z[1] += M_PI;
-    } else {
-      break;
-    }
-  }
+  float px = x_(0);                                                         
+  float py = x_(1);                                                         
+  float vx = x_(2);                                                         
+  float vy = x_(3);
+  float root = sqrt(px*px+py*py);
 
-  VectorXd z_pred = H_ * x_;
-  VectorXd y = my_z - z_pred;
+  VectorXd h_x = VectorXd(3);
+  h_x << root, atan2(py, px), (px*vx+py*vy)/root;
+  VectorXd y = z - h_x;
   MatrixXd Ht = H_.transpose();
   MatrixXd S = H_ * P_ * Ht + R_;
   MatrixXd Si = S.inverse();
   MatrixXd PHt = P_ * Ht;
   MatrixXd K = PHt * Si;
+
+  y[1] = getValidAngle(y[1]);
 
   //new estimate
   x_ = x_ + (K * y);
@@ -81,3 +94,5 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
   MatrixXd I = MatrixXd::Identity(x_size, x_size);
   P_ = (I - K * H_) * P_; 
 }
+
+
